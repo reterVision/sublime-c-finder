@@ -125,7 +125,6 @@ class KeywordSearch(threading.Thread):
                             for i, l in enumerate(f):
                                 result = pattern.findall(l)
                                 if result:
-                                    print file_name, l
                                     # Don't add comment lines
                                     if not re.findall(func_pattern, l):
                                         if ';' not in l and '#define' not in l:
