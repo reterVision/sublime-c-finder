@@ -1,0 +1,5 @@
+[  
+    {
+        "keys": ["super+alt+c"], "command": "c_finder"
+    }
+]
