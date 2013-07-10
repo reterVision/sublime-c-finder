@@ -61,6 +61,7 @@ class CFinderCommand(sublime_plugin.TextCommand):
 
     def open_selected(self, index):
         if index == -1:
+            self.result_list[:] = []
             return
         header_info = self.result_list[index].split(';')
         header_file = '{0}:{1}'.format(header_info[0], header_info[1])
