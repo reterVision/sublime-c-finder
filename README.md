@@ -26,6 +26,11 @@ Usage
 1. Select any function or macro that you don't familiar with and you want see where does it been defined.
 2. Press ```cmd + alt + c```
 
+Limitation
+==========
+
+1. The search may failed when you drag a source file into another project window.
+
 Disclaimer
 ======
 This project is far away from being used in production environment, use it at your own risk.

@@ -73,10 +73,7 @@ class KeywordSearch(threading.Thread):
         self.user_path = user_path
         self.result_list = []
         self.searched_header_list = []
-
-        # Only recursively search selected keyword definition
-        # in user created headers.
-        self.header_pattern = re.compile(r'#include\s*"([^"]*)"')
+        self.header_pattern = re.compile(r'#include\s*["<]([^"]*)[">]')
 
         threading.Thread.__init__(self)
 
