@@ -9,19 +9,21 @@ class CFinderCommand(sublime_plugin.TextCommand):
     result_list = []
 
     def run(self, edit):
+        # Search starts from the file itself.
+        current_file = self.view.file_name().split('/').pop()
+        headers = [current_file]
+
         # Get Include PATH, now only support *nix systems.
-        system_path = '/usr/include/'
+        current_path = [os.path.dirname(self.view.file_name())]
         try:
             opened_folder = self.view.window().folders()[0] + '/'
         except IndexError:
             opened_folder = '.'
         user_path = [opened_folder + name for name in os.listdir(opened_folder)
                      if os.path.isdir(os.path.join(opened_folder, name))]
-        current_file = self.view.file_name().split('/').pop()
+        search_path = list(set(current_path + user_path))
 
-        # Search starts from the file itself.
-        headers = [current_file]
-
+        # Take the word selected by user as keyword to search.
         keywords = []
         sels = self.view.sel()
         if not sels:
@@ -30,7 +32,7 @@ class CFinderCommand(sublime_plugin.TextCommand):
             keywords.append(self.view.substr(sel))
 
         threads = []
-        thread = KeywordSearch(keywords, headers, system_path, user_path)
+        thread = KeywordSearch(keywords, headers, search_path)
         threads.append(thread)
         thread.start()
 
@@ -53,6 +55,7 @@ class CFinderCommand(sublime_plugin.TextCommand):
                 100)
             return
 
+        self.view.sel().clear()
         current_window = self.view.window()
         current_window.show_quick_panel(self.result_list, self.open_selected)
 
@@ -62,15 +65,14 @@ class CFinderCommand(sublime_plugin.TextCommand):
         header_info = self.result_list[index].split(';')
         header_file = '{0}:{1}'.format(header_info[0], header_info[1])
         self.view.window().open_file(header_file, sublime.ENCODED_POSITION)
-        self.view.sel().clear()
+        self.result_list[:] = []
 
 
 class KeywordSearch(threading.Thread):
-    def __init__(self, keywords, headers, system_path, user_path):
+    def __init__(self, keywords, headers, search_path):
         self.keywords = keywords
         self.headers = headers
-        self.system_path = system_path
-        self.user_path = user_path
+        self.search_path = search_path
         self.result_list = []
         self.searched_header_list = []
         self.header_pattern = re.compile(r'#include\s*["<]([^"]*)[">]')
@@ -96,50 +98,35 @@ class KeywordSearch(threading.Thread):
     def search(self, headers, pattern, keyword):
         next_headers = []
         for header in headers:
-            try:
-                file_name = os.path.join(self.system_path, header)
-                with open(file_name, 'rb') as f:
-                    for i, line in enumerate(f):
-                        result = pattern.findall(line)
-                        if result:
-                            result = '{0};{1};{2}'.format(file_name,
-                                                          i + 1,
-                                                          line)
-                            self.result_list.append(result)
-                        header_result = self.header_pattern.findall(line)
-                        if header_result:
-                            for next_header in header_result:
-                                next_headers.append(next_header)
-            except IOError:
-                func_pattern = self.get_func_pattern(keyword)
-                return_value_pattern = self.get_return_value_pattern(keyword)
-                return_pattern = self.get_return_pattern(keyword)
+            func_pattern = self.get_func_pattern(keyword)
+            return_value_pattern = self.get_return_value_pattern(keyword)
+            return_pattern = self.get_return_pattern(keyword)
 
-                for path in self.user_path:
-                    file_name = os.path.join(path, header)
-                    try:
-                        with open(file_name, 'rb') as f:
-                            for i, l in enumerate(f):
-                                result = pattern.findall(l)
-                                if result:
-                                    # Don't add comment lines
-                                    if not re.findall(func_pattern, l):
-                                        if ';' not in l and '#define' not in l:
-                                            continue
-                                    if return_value_pattern.findall(l):
+            for path in self.search_path:
+                file_name = os.path.join(path, header)
+                try:
+                    with open(file_name, 'rb') as f:
+                        for i, l in enumerate(f):
+                            result = pattern.findall(l)
+                            if result:
+                                # Don't add comment lines
+                                if not re.findall(func_pattern, l):
+                                    if ';' not in l and '#define' not in l:
                                         continue
-                                    if return_pattern.findall(l):
-                                        continue
-                                    result = '{0};{1};{2}'.format(file_name,
-                                                                  i + 1,
-                                                                  l)
-                                    self.result_list.append(result)
-                                header_result = self.header_pattern.findall(l)
-                                if header_result:
-                                    for next_header in header_result:
-                                        next_headers.append(next_header)
-                    except IOError:
-                        continue
+                                if return_value_pattern.findall(l):
+                                    continue
+                                if return_pattern.findall(l):
+                                    continue
+                                result = '{0};{1};{2}'.format(file_name,
+                                                              i + 1,
+                                                              l)
+                                self.result_list.append(result)
+                            header_result = self.header_pattern.findall(l)
+                            if header_result:
+                                for next_header in header_result:
+                                    next_headers.append(next_header)
+                except IOError:
+                    continue
 
         # Record searched headers.
         self.searched_header_list += headers
